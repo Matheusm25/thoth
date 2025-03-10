@@ -1,28 +1,20 @@
 package main
 
 import (
-	"fmt"
-	"time"
+	"log"
 
-	"github.com/matheusm25/thoth/src/modules/broker"
+	"github.com/joho/godotenv"
+	"github.com/matheusm25/thoth/src/modules/websocket"
 )
 
 func main() {
-	broker := broker.NewBroker()
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
 
-	subscriber := broker.Subscribe("websocket", func(msg string) {
-		fmt.Printf("Received: %v\n", msg)
+	broadcast := make(chan string)
+	websocket.InitWebsocketServer(func(msg string) {
+		broadcast <- msg
 	})
-
-	broker.Publish("websocket", "First message to first listener")
-	broker.Publish("websocket", "Second message to fisrt listener")
-	broker.Publish("websocket-fake", "This message should not show")
-
-	time.Sleep(2 * time.Second)
-
-	broker.Unsubscribe("websocket", subscriber)
-
-	broker.Publish("websocket", "This message won't be received.")
-
-	time.Sleep(time.Second)
 }
