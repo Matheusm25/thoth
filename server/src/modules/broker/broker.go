@@ -7,19 +7,20 @@ import (
 )
 
 type Broker struct {
-	subscribers map[string][]*Subscriber
-	mutex       sync.Mutex
+	subscribers    map[string][]*Subscriber
+	messagesOnHold map[string][]*Message
+	mutex          sync.Mutex
 }
 
 func NewBroker() *Broker {
 	return &Broker{
-		subscribers: make(map[string][]*Subscriber),
+		subscribers:    make(map[string][]*Subscriber),
+		messagesOnHold: make(map[string][]*Message),
 	}
 }
 
 func (b *Broker) Subscribe(topic string, executer MessageConsumerFunction) *Subscriber {
 	b.mutex.Lock()
-	defer b.mutex.Unlock()
 
 	subscriber := &Subscriber{
 		Channel:     make(chan string),
@@ -30,6 +31,17 @@ func (b *Broker) Subscribe(topic string, executer MessageConsumerFunction) *Subs
 
 	b.subscribers[topic] = append(b.subscribers[topic], subscriber)
 
+	if messages, found := b.messagesOnHold[topic]; found {
+		b.mutex.Unlock()
+		for _, msg := range messages {
+			b.Publish(msg)
+			b.messagesOnHold[topic] = append(messages[:0], messages[1:]...)
+		}
+
+		return subscriber
+	}
+
+	b.mutex.Unlock()
 	return subscriber
 }
 
@@ -42,26 +54,36 @@ func (b *Broker) Unsubscribe(topic string, subscriber *Subscriber) {
 			if sub == subscriber {
 				close(sub.Channel)
 				b.subscribers[topic] = append(subscribers[:i], subscribers[i+1:]...)
+				println("Unsubscribed from topic: ", topic)
 				return
 			}
 		}
 	}
 }
 
-func (b *Broker) Publish(topic string, payload string) {
+func (b *Broker) Publish(message *Message) {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 
-	if subscribers, found := b.subscribers[topic]; found {
+	if subscribers, found := b.subscribers[message.Topic]; found {
+		println("Found subscribers for topic: ", message.Topic, " ", found)
 		for _, sub := range subscribers {
 			select {
-			case sub.Channel <- payload:
+			case sub.Channel <- message.Payload:
 			case <-time.After(time.Second):
-				fmt.Printf("Subscriber slow. Unsubscribing from topic: %s\n", topic)
-				b.Unsubscribe(topic, sub)
+				fmt.Printf("Subscriber slow. Unsubscribing from topic: %s\n", message.Topic)
+				b.Unsubscribe(message.Topic, sub)
 			}
 		}
+	} else {
+		b.SetMessageOnHold(message)
 	}
+}
+
+func (b *Broker) SetMessageOnHold(message *Message) {
+	fmt.Printf("No subscribers found for topic: %s. Message on hold\n", message.Topic)
+
+	b.messagesOnHold[message.Topic] = append(b.messagesOnHold[message.Topic], message)
 }
 
 func TestBroker() {
@@ -71,15 +93,35 @@ func TestBroker() {
 		fmt.Printf("Received: %v\n", msg)
 	})
 
-	broker.Publish("websocket", "First message to first listener")
-	broker.Publish("websocket", "Second message to fisrt listener")
-	broker.Publish("websocket-fake", "This message should not show")
+	broker.Publish(&Message{
+		ID:          "1",
+		Topic:       "websocket",
+		MessageType: "PUBLISH",
+		Payload:     "First message to fisrt listener",
+	})
+	broker.Publish(&Message{
+		ID:          "1",
+		Topic:       "websocket",
+		MessageType: "PUBLISH",
+		Payload:     "Second message to fisrt listener",
+	})
+	broker.Publish(&Message{
+		ID:          "1",
+		Topic:       "websocket-fake",
+		MessageType: "PUBLISH",
+		Payload:     "This message should not show",
+	})
 
 	time.Sleep(2 * time.Second)
 
 	broker.Unsubscribe("websocket", subscriber)
 
-	broker.Publish("websocket", "This message won't be received.")
+	broker.Publish(&Message{
+		ID:          "1",
+		Topic:       "websocket",
+		MessageType: "PUBLISH",
+		Payload:     "This message won't be received",
+	})
 
 	time.Sleep(time.Second)
 }

@@ -9,31 +9,34 @@ import (
 )
 
 type HandleMessagesFunction func(string)
+type HandleConnectionFunction func(*websocket.Conn)
 
 var Clients = make(map[*websocket.Conn]bool)
 
-func InitWebsocketServer(handleMessages HandleMessagesFunction) {
+func InitWebsocketServer(handleMessages HandleMessagesFunction, handleConnection HandleConnectionFunction) {
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "ok")
 	})
 	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
-		handleWebsocketConnection(w, r, handleMessages)
+		handleWebsocketConnection(w, r, handleMessages, handleConnection)
 	})
 
-	fmt.Printf("Server started on port %v", os.Getenv("PORT"))
+	fmt.Printf("Server started on port %v\n", os.Getenv("PORT"))
 	err := http.ListenAndServe(fmt.Sprintf(":%v", os.Getenv("PORT")), nil)
 	if err != nil {
 		panic("Error starting server: " + err.Error())
 	}
 }
 
-func handleWebsocketConnection(w http.ResponseWriter, r *http.Request, handleMessages HandleMessagesFunction) {
+func handleWebsocketConnection(w http.ResponseWriter, r *http.Request, handleMessages HandleMessagesFunction, handleConnection HandleConnectionFunction) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 	defer conn.Close()
+
+	handleConnection(conn)
 
 	Clients[conn] = true
 
@@ -64,7 +67,7 @@ func TestWebsocket() {
 
 	InitWebsocketServer(func(msg string) {
 		broadcast <- msg
-	})
+	}, func(c *websocket.Conn) {})
 
 	go func() {
 		for {
