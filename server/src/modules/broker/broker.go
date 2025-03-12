@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"sync"
 	"time"
+
+	SliceUtils "github.com/matheusm25/thoth/src/utils/slices"
 )
 
 type Broker struct {
@@ -64,14 +66,16 @@ func (b *Broker) Publish(message *Message) {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 
-	if subscribers, found := b.subscribers[message.Topic]; found && len(subscribers) > 0 {
-		for _, sub := range subscribers {
-			select {
-			case sub.Channel <- message.Payload:
-			case <-time.After(time.Second):
-				fmt.Printf("Subscriber slow. Unsubscribing from topic: %s\n", message.Topic)
-				b.Unsubscribe(message.Topic, sub)
-			}
+	filteredSubscribers := SliceUtils.Filter(b.subscribers[message.Topic], func(s *Subscriber) bool {
+		return !s.isProcessingMessage
+	})
+
+	if len(filteredSubscribers) > 0 {
+		select {
+		case filteredSubscribers[0].Channel <- message.Payload:
+		case <-time.After(time.Second):
+			fmt.Printf("Subscriber slow. Unsubscribing from topic: %s\n", message.Topic)
+			b.Unsubscribe(message.Topic, filteredSubscribers[0])
 		}
 	} else {
 		b.SetMessageOnHold(message)

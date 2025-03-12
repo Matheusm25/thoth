@@ -1,10 +1,13 @@
 package broker
 
-import "fmt"
+import (
+	"fmt"
+)
 
 type Subscriber struct {
-	Channel     chan string
-	Unsubscribe chan bool
+	Channel             chan string
+	isProcessingMessage bool
+	Unsubscribe         chan bool
 }
 
 type MessageConsumerFunction func(string)
@@ -17,8 +20,9 @@ func (s *Subscriber) OnMessage(executer MessageConsumerFunction) {
 				fmt.Println("Subscriber channel closed.")
 				return
 			}
-
+			s.isProcessingMessage = true
 			executer(msg)
+			s.isProcessingMessage = false
 		case <-s.Unsubscribe:
 			fmt.Println("Unsubscribed.")
 			return
