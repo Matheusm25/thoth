@@ -31,7 +31,7 @@ func (b *Broker) Subscribe(topic string, executer MessageConsumerFunction) *Subs
 
 	b.subscribers[topic] = append(b.subscribers[topic], subscriber)
 
-	if messages, found := b.messagesOnHold[topic]; found {
+	if messages, found := b.messagesOnHold[topic]; found && len(messages) > 0 {
 		b.mutex.Unlock()
 		for _, msg := range messages {
 			b.Publish(msg)
@@ -54,7 +54,6 @@ func (b *Broker) Unsubscribe(topic string, subscriber *Subscriber) {
 			if sub == subscriber {
 				close(sub.Channel)
 				b.subscribers[topic] = append(subscribers[:i], subscribers[i+1:]...)
-				println("Unsubscribed from topic: ", topic)
 				return
 			}
 		}
@@ -65,8 +64,7 @@ func (b *Broker) Publish(message *Message) {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 
-	if subscribers, found := b.subscribers[message.Topic]; found {
-		println("Found subscribers for topic: ", message.Topic, " ", found)
+	if subscribers, found := b.subscribers[message.Topic]; found && len(subscribers) > 0 {
 		for _, sub := range subscribers {
 			select {
 			case sub.Channel <- message.Payload:
