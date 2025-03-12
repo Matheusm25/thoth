@@ -2,6 +2,7 @@ package broker
 
 import (
 	"fmt"
+	"slices"
 	"sync"
 	"time"
 
@@ -83,9 +84,31 @@ func (b *Broker) Publish(message *Message) {
 }
 
 func (b *Broker) SetMessageOnHold(message *Message) {
-	fmt.Printf("No subscribers found for topic: %s. Message on hold\n", message.Topic)
-
 	b.messagesOnHold[message.Topic] = append(b.messagesOnHold[message.Topic], message)
+	fmt.Printf("No subscribers found for topic: %s. Messages on hold: %v\n", message.Topic, len(b.messagesOnHold[message.Topic]))
+
+	if len(b.messagesOnHold[message.Topic]) == 1 {
+		go b.MessagesOnHoldRoutine(message.Topic)
+	}
+}
+
+func (b *Broker) MessagesOnHoldRoutine(topic string) {
+	for {
+		if len(b.messagesOnHold[topic]) == 0 {
+			return
+		}
+
+		filteredSubscribers := SliceUtils.Filter(b.subscribers[topic], func(s *Subscriber) bool {
+			return !s.isProcessingMessage
+		})
+
+		if len(filteredSubscribers) > 0 {
+			b.Publish(b.messagesOnHold[topic][0])
+			b.messagesOnHold[topic] = slices.Delete(b.messagesOnHold[topic], 0, 1)
+		}
+
+		time.Sleep(time.Second)
+	}
 }
 
 func TestBroker() {
