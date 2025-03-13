@@ -68,7 +68,7 @@ func (b *Broker) Publish(message *Message) {
 	defer b.mutex.Unlock()
 
 	filteredSubscribers := SliceUtils.Filter(b.subscribers[message.Topic], func(s *Subscriber) bool {
-		return !s.isProcessingMessage
+		return !s.IsProcessingMessage
 	})
 
 	if len(filteredSubscribers) > 0 {
@@ -99,7 +99,7 @@ func (b *Broker) MessagesOnHoldRoutine(topic string) {
 		}
 
 		filteredSubscribers := SliceUtils.Filter(b.subscribers[topic], func(s *Subscriber) bool {
-			return !s.isProcessingMessage
+			return !s.IsProcessingMessage
 		})
 
 		if len(filteredSubscribers) > 0 {

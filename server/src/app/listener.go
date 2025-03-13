@@ -63,6 +63,12 @@ func (app *App) HandleNewMessage(msg string) {
 		app.handleSubscribeMessage(&message)
 	case "UNSUBSCRIBE":
 		app.handleUnsubscribeMessage(&message)
+	case "ACKNOWLEDGE":
+		app.handleAcknowledgeMessage(&message)
+	case "UNACKNOWLEDGE":
+		app.handleUnacknowledgeMessage(&message)
+	default:
+		fmt.Printf("Invalid message type: %v\n", message.MessageType)
 	}
 }
 
@@ -118,4 +124,45 @@ func (app *App) handleUnsubscribeMessage(message *broker.Message) {
 
 	app.broker.Unsubscribe(message.Topic, client.Topics[message.Topic])
 	delete(client.Topics, message.Topic)
+}
+
+func (app *App) handleAcknowledgeMessage(message *broker.Message) {
+	app.mutex.Lock()
+	defer app.mutex.Unlock()
+	fmt.Printf("Acknowledging message: %v\n", message)
+
+	client := app.clients[message.ID]
+	if client == nil {
+		fmt.Printf("Client not found: %v\n", message.ID)
+		return
+	}
+
+	if client.Topics[message.Topic] == nil {
+		fmt.Printf("Client not subscribed to topic: %v\n", message.Topic)
+		return
+	}
+
+	client.Topics[message.Topic].IsProcessingMessage = false
+}
+
+func (app *App) handleUnacknowledgeMessage(message *broker.Message) {
+	app.mutex.Lock()
+	defer app.mutex.Unlock()
+	fmt.Printf("Unacknowledging message: %v\n", message)
+
+	client := app.clients[message.ID]
+	if client == nil {
+		fmt.Printf("Client not found: %v\n", message.ID)
+		return
+	}
+
+	if client.Topics[message.Topic] == nil {
+		fmt.Printf("Client not subscribed to topic: %v\n", message.Topic)
+		return
+	}
+
+	client.Topics[message.Topic].IsProcessingMessage = false
+
+	message.MessageType = "PUBLISH"
+	app.broker.Publish(message)
 }

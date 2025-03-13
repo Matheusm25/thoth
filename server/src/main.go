@@ -19,5 +19,4 @@ func main() {
 	application := app.NewApp(broker)
 
 	websocket_server.InitWebsocketServer(application.HandleNewMessage, application.HandleNewConnection)
-
 }

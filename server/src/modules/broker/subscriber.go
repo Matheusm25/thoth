@@ -6,7 +6,7 @@ import (
 
 type Subscriber struct {
 	Channel             chan string
-	isProcessingMessage bool
+	IsProcessingMessage bool
 	Unsubscribe         chan bool
 }
 
@@ -20,9 +20,8 @@ func (s *Subscriber) OnMessage(executer MessageConsumerFunction) {
 				fmt.Println("Subscriber channel closed.")
 				return
 			}
-			s.isProcessingMessage = true
+			s.IsProcessingMessage = true
 			executer(msg)
-			s.isProcessingMessage = false
 		case <-s.Unsubscribe:
 			fmt.Println("Unsubscribed.")
 			return

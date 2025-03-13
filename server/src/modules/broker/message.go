@@ -15,7 +15,13 @@ type Message struct {
 }
 
 func (m *Message) Validate() (bool, error) {
-	validMessageTypes := []string{"PUBLISH", "SUBSCRIBE", "UNSUBSCRIBE"}
+	validMessageTypes := []string{
+		"PUBLISH",
+		"SUBSCRIBE",
+		"UNSUBSCRIBE",
+		"ACKNOWLEDGE",
+		"UNACKNOWLEDGE",
+	}
 
 	if !SliceUtils.Contains(validMessageTypes, strings.ToUpper(m.MessageType)) {
 		return false, fmt.Errorf("invalid message type: %v", m.MessageType)
