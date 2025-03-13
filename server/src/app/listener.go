@@ -164,5 +164,5 @@ func (app *App) handleUnacknowledgeMessage(message *broker.Message) {
 	client.Topics[message.Topic].IsProcessingMessage = false
 
 	message.MessageType = "PUBLISH"
-	app.broker.Publish(message)
+	app.broker.SetMessageOnHold(message)
 }
