@@ -22,6 +22,12 @@ func NewBroker() *Broker {
 	}
 }
 
+func (b *Broker) BootstrapMessagesOnHold(messages []*Message) {
+	for _, message := range messages {
+		b.SetMessageOnHold(message)
+	}
+}
+
 func (b *Broker) Subscribe(topic string, executer MessageConsumerFunction) *Subscriber {
 	b.mutex.Lock()
 
